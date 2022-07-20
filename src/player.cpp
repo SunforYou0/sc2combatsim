@@ -4,6 +4,9 @@
 
 #include <iostream>
 #include <vector>
+#define TEST
+
+
 
 
 void Player::SetBot(sc2::Agent* agent, playerid_t playerID) {
@@ -34,7 +37,7 @@ void Player::GameInit() {
 	_genpos = _offset + _centerpos;
 	_combinator.set_unitdata(Bot()->Observation());
 
-	if (_playerID<0) {
+	if (_playerID < 0) {
 		_playerID = Bot()->Observation()->GetPlayerID();
 	}
 }
@@ -85,13 +88,13 @@ Player::GetSurvivedUnits(playerid_t playerID) const {
 	}
 	return std::make_tuple(squad_unittypeid, squad_quantity);
 }
-
+// 添加游戏单位 1
 void Player::PlaceUnit(sc2::UnitTypeID unit, uint32_t numbers, sc2::Vector2D pos, playerid_t playerID) {
 	sc2::DebugInterface* debug = Bot()->Debug();
 	debug->DebugCreateUnit(unit, pos, playerID, numbers);
 	//debug->SendDebug();
 }
-
+// 添加游戏单位 1
 std::vector<int> Player::PlaceUnits(
 	const std::vector<sc2::UnitTypeID>& squad_unittypeid,
 	const std::vector<int>& squad_quantity,
@@ -125,6 +128,96 @@ std::vector<int> Player::PlaceUnits(
 	const std::vector<int>& squad_quantity,
 	bool shuffle) {
 	return PlaceUnits(squad_unittypeid, squad_quantity, _centerpos + _config.offset, _playerID, shuffle);
+}
+
+
+// 添加游戏单位 -可设置位置 
+std::vector<int> Player::PlaceUnitsPOS(
+	const std::vector<sc2::UnitTypeID>& squad_unittypeid,
+	const std::vector<int>& squad_quantity,
+	std::vector<sc2::Vector2D> pos_vec,
+	playerid_t playerID,
+	bool shuffle
+) {
+	sc2::DebugInterface* debug = Bot()->Debug();
+	size_t length = squad_unittypeid.size();
+	assert(length == squad_quantity.size());
+	std::vector<int> random_index(length, 0);
+	for (int i = 0; i < length; i++) {
+		random_index[i] = i;
+	}
+	if (shuffle) {
+		_random.shuffle(random_index.begin(), random_index.end());
+	}
+	for (int i = 0; i < length; i++) {
+		int index = random_index[i];
+		int quantity = squad_quantity[index];
+		if (!quantity) continue;
+		sc2::UnitTypeID unittypeID = squad_unittypeid[index];
+		sc2::Point2D pos = pos_vec[index];
+		debug->DebugCreateUnit(unittypeID, pos, playerID, quantity);
+	}
+	//debug->SendDebug();
+	return random_index;
+}
+
+
+std::vector<int> Player::PlaceUnitsPOS(
+	const std::vector<sc2::UnitTypeID>& squad_unittypeid,
+	const std::vector<int>& squad_quantity,
+	std::vector<std::string>& pos_id,
+	bool shuffle) {
+	const sc2::GameInfo game_info = Bot()->Observation()->GetGameInfo();
+
+	std::vector <sc2::Point2D> pos_vec;
+
+	float x_gap = game_info.playable_max.x - game_info.playable_min.x;
+	float y_gap = game_info.playable_max.y - game_info.playable_min.y;
+	size_t length = pos_id.size();// 长度
+	for (int i = 0; i < length; i++) {
+		sc2::Point2D pos;
+		if (pos_id[i] == "N") {
+			//N-north
+			pos.x = _centerpos.x;
+			pos.y = _centerpos.y + y_gap;
+		}
+		else if (pos_id[i] == "S")
+		{
+			//S-south
+			pos.x = _centerpos.x;
+			pos.y = _centerpos.y - y_gap;
+		}
+		else if (pos_id[i] == "W") {
+			//W-west
+			pos.x = _centerpos.x - x_gap;
+			pos.y = _centerpos.y;
+		}
+		else if (pos_id[i] == "E")
+		{//E-east
+			pos.x = _centerpos.x + x_gap;
+			pos.y = _centerpos.y;
+		}
+		else if (pos_id[i] == "M")
+		{
+
+			pos = _centerpos;
+		}
+		else {
+			std::cout << "!!!pos_id exception!!!" << std::endl;
+			pos = _centerpos;
+		}
+		pos_vec.push_back(pos);
+	}
+
+#ifdef TEST
+	std::cout << "GameInfo.width:" << game_info.width << std::endl;
+	std::cout << "GameInfo.height:" << game_info.height << std::endl;
+	std::cout << "GameInfo.playable_min:" << game_info.playable_min.x << "," << game_info.playable_min.y << std::endl;
+	std::cout << "GameInfo.playable_max:" << game_info.playable_max.x << "," << game_info.playable_max.y << std::endl;
+	std::cout << "pos_vec.size():" << pos_vec.size() << std::endl;
+#endif // TEST
+
+	return PlaceUnitsPOS(squad_unittypeid, squad_quantity, pos_vec, _playerID, shuffle);
 }
 
 void Player::KillPlayerUnit(playerid_t playerID) {
@@ -201,7 +294,7 @@ void Player::ScreenCapture(const std::string& filename) {
 	int32_t width = mapraw.size().x();
 	int32_t height = mapraw.size().y();
 	int32_t length = map.length();
-	
+
 	if (length == 0) {
 		std::cerr << "Image size is 0. Check if rendering is enabled!" << std::endl;
 	}
@@ -211,3 +304,4 @@ void Player::ScreenCapture(const std::string& filename) {
 
 	Util::save_BGR_image(filename, map.data(), width, height);
 }
+

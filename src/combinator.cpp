@@ -1,4 +1,4 @@
-#include "combinator.h"
+﻿#include "combinator.h"
 
 #include "json/json.h"
 
@@ -8,7 +8,7 @@
 
 /* //////////
 Terran - ground
-    "scv",			// 45
+	"scv",			// 45
 	"marine",		// 48
 	"marauder",		// 51
 	"reaper",		// 49
@@ -27,7 +27,7 @@ Terran - air
 	"banshee",
 	"raven",
 	"battlecruiser",
-	
+
 Zerg - ground
 	"drone",		// 104
 	"queen",		// 126
@@ -37,11 +37,11 @@ Zerg - ground
 	"ravager",		// 688
 	"hydralisk",	// 107
 	"ultralisk",	// 109
-    //"lurkermpburrowed", // 911, burrowed 912
-	                      // mp 502, mpburrowed 503
+	//"lurkermpburrowed", // 911, burrowed 912
+						  // mp 502, mpburrowed 503
 	//"infestor",   // 111
 	//"swarmhostburrowedmp",  //mp 494, burrowedmp 493
-	
+
 Zerg - air
 	"mutalisk",
 	"corruptor",
@@ -151,36 +151,36 @@ const static std::vector<std::vector<std::string>> predefined_cand({
 	{
 		/** ground units **/
 		"lurkermpburrowed",   // lurker: immovable
-							  // lurkermp 502
-							  // lurkermpburrowed 503
-							  // (unused) lurker 911
-							  // (unused) lurkerburrowed 912
+		// lurkermp 502
+		// lurkermpburrowed 503
+		// (unused) lurker 911
+		// (unused) lurkerburrowed 912
 
-		"infestor",           // infestor: spellcaster
-							  // infestor 111
+"infestor",           // infestor: spellcaster
+// infestor 111
 
-		"swarmhostburrowedmp",// swarmhost: spellcaster
-							  // swarmhostmp 494
-							  // swarmhostburrowedmp 493
+"swarmhostburrowedmp",// swarmhost: spellcaster
+// swarmhostmp 494
+// swarmhostburrowedmp 493
 
-		/*** air  units ***/
-		"overlord",	          // overlord: sight, shuttle
-		"overseer",	          // detector
-	},
-	// #9 - Protoss, specially excluded.
-	{
-		/** ground units **/
-		"disruptor",          // spellcaster
+/*** air  units ***/
+"overlord",	          // overlord: sight, shuttle
+"overseer",	          // detector
+},
+// #9 - Protoss, specially excluded.
+{
+	/** ground units **/
+	"disruptor",          // spellcaster
 
-		/*** air  units ***/
-		"oracle",             // spellcaster?
-		"mothership",         // cloaker
-		"warpprism",          // shuttle
-		"observer",           // detector
-	},
-});
+	/*** air  units ***/
+	"oracle",             // spellcaster?
+	"mothership",         // cloaker
+	"warpprism",          // shuttle
+	"observer",           // detector
+},
+	});
 
-void Combinator::reset(){
+void Combinator::reset() {
 	set_resources(config.limit_ore, config.limit_gas, config.limit_food);
 	if (config.index) {
 		add_unitlist(config.index);
@@ -225,14 +225,14 @@ std::tuple<int, int, float> Combinator::get_resources() const {
 	return std::make_tuple(mineral, gas, food);
 }
 
-void Combinator::clear_unitlist(){
+void Combinator::clear_unitlist() {
 	this->candidates.clear();
 }
 
-void Combinator::add_unitlist(int index){
+void Combinator::add_unitlist(int index) {
 	// bound check
 	const size_t len = predefined_cand.size();
-	
+
 	if (0 >= index || index >= len) {
 		std::cout << "Index out of bound: " << index << " max: " << len << std::endl;
 		exit(1);
@@ -249,17 +249,17 @@ void Combinator::add_unitlist(const std::string& unitname) {
 	this->candidates.push_back(id);
 }
 
-void Combinator::add_unitlist(const std::vector<sc2::UnitTypeID>& new_candidates){
+void Combinator::add_unitlist(const std::vector<sc2::UnitTypeID>& new_candidates) {
 	this->candidates.insert(this->candidates.end(),
-	                        new_candidates.begin(),
-						    new_candidates.end());
+		new_candidates.begin(),
+		new_candidates.end());
 }
 
-std::vector<sc2::UnitTypeID> Combinator::get_unitlist() const{
+std::vector<sc2::UnitTypeID> Combinator::get_unitlist() const {
 	return candidates;
 }
 
-bool Combinator::pick_and_rearrange_candidates(float probability){
+bool Combinator::pick_and_rearrange_candidates(float probability) {
 	if (probability <= 0.0f) {
 		std::cerr << "Fatal error : p = 0!" << std::endl;
 		exit(1);
@@ -279,7 +279,7 @@ bool Combinator::pick_and_rearrange_candidates(float probability){
 	return true;
 }
 
-bool Combinator::make_squad(){
+bool Combinator::make_squad() {
 	bool success = false;
 	int32_t variables = candidates.size();
 
@@ -287,15 +287,16 @@ bool Combinator::make_squad(){
 	squad_quantity.clear();
 
 	std::vector<float> ratios;
-	ratios = random.dirichlet1(variables);
+	ratios = random.dirichlet1(variables);//可能是返回一个指定长度的随机数组之类的
 	for (const auto& unittypeid : candidates) {
 		float num_affordable = get_unit_affordable(unittypeid);
 		float ratio = (variables == 1) ? 1.0f : random.beta1k(variables - 1);
-		int32_t num_bought = static_cast<int32_t>(std::floor(num_affordable * ratio));
+		int32_t num_bought = static_cast<int32_t>(std::floor(num_affordable * ratio));//随机生成生成的单位的数量
 		subtract_unit_resource(unittypeid, num_bought);
 		variables--;
 		// write
 		if (num_bought) {
+			//	num_bought>0
 			squad_unittypeid.push_back(unittypeid);
 			squad_quantity.push_back(num_bought);
 			std::cerr << UnitTypeToName(unittypeid.ToType()) << " " << num_bought << std::endl;

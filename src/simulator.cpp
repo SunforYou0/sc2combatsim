@@ -2,20 +2,24 @@
 
 #include "bots.h"
 #include "util.h"
-
+#include "ProjectConfig.h"
 #include <sc2api/sc2_api.h>
 #include <sc2utils/sc2_manage_process.h>
-
+#include <thread>
+#include <chrono>
 #include <iostream>
 
 //#define SCREENCAPTURE
-
+#define PATH_SQUAD "D:/scII/sc2combatsim/config//squad.json"
+#define WORK_PATH	"D:/scII/sc2combatsim/config"
+#define REPLAY_PATH "D:/scII/sc2combatsim/config//1.SC2Replay"
 int Simulator::Begin() {
 
 	set();
-
+	bool CREATE_FLAG = false;
+	// nround 不同剧本的数量
 	while (nround >= cround) { // While simulation is not finished. cround |-> Z_[1, nround] 
-
+		std::cout << std::endl << "begin::croung/nround:" << cround << "/" << nround << std::endl;
 		std::cout << "launch!" << std::endl;
 		_coordinator->LaunchStarcraft();
 
@@ -63,82 +67,92 @@ int Simulator::Begin() {
 
 		// wait child processes for 1 sec to die.
 		sc2::SleepFor(1000);
+
+		cround++;
+		std::cout << std::endl << "croung/nround" << cround << std::endl;
 	}
 	return 0;
 }
 
 int Simulator::Update() {
+	bool INGAME_CREATE = true;
 	enum {
-		onstart,
-		onchange,
-		indelay,
-		oncreate,
-		increate,
-		oncheck,
-		oncount,
-		onremove,
-		inremove,
-		onfinish,
-		infinish
+		onstart,	// 初始化，开启游戏视野。
+		onchange,//获取新的小队。
+		indelay,	//延迟等待，用于等待尸体消失。
+		oncreate,	//创建小队。
+		increate,	//等待单位创建完成。
+		oncheck,	//检查游戏状态，判断是否有一方被淘汰。
+		ingamecreate,//用于等待游戏过程中的创建，防止两个小队同时创建出来
+		oncount,	//计算游戏结果。
+		onremove,//移除所有小队。
+		inremove,//等待所有单位清除。
+		onfinish,	//游戏模拟结束。
+		infinish	//结束中。
+
 	} simflag = onstart;
 
 	// nframe: frame limit for timeout
 	// nbattle: battle limit for one sc2 process. total process time < 6:07:09
-	const int32_t nframe = 10000 / stepsize;	// currently 5.5minutes
-	const int32_t nbattle = 500; // 200
-	const int32_t ndelay = 5;
+	const int32_t nframe = 10000 / stepsize;	// currently 5.5minutes 帧数限制
+	const int32_t nbattle = 500; // 200	战斗限制
+	const int32_t ndelay = 5;//延迟
 	int32_t cframe = 0;
 	int32_t cbattle = 0;
 	int32_t cdelay = 0;
 
-	std::vector<sc2::UnitTypeID> squad_unittypeid1, squad_unittypeid2;
-	std::vector<int> squad_quantity1, squad_quantity2;
+	std::vector<std::string> red_tactic;
+	std::vector<Util::POS_SQUAD> red_squad_vector;
 
+	int wave = 0;	// attack wave
+	std::vector<sc2::UnitTypeID> squad_unittypeid1, squad_unittypeid2;	// 类型id，要先找到这个sc2::UnitTypeID
+	std::vector<int> squad_quantity1, squad_quantity2;	// 数量
+	std::vector<std::string> squad_unit_position1, squad_unit_position2; // 放置位置 
 	while (_coordinator->Update()) {
 		std::cout << std::hex << simflag << std::dec << std::flush;
 #if !defined(__linux__)
 		sc2::SleepFor(1);	// to reduce load to cpu and prevent disconnection.
 #endif
-		//std::cout << cround << std::endl;
+		// std::cout << cround << std::endl;
 		if (simflag != oncheck) {
 			recorder.err() << simflag;
 		}
 		switch (simflag) {
-		// initialization, turn on vision
+			// initialization, turn on vision
 		case onstart: {
 			p1.GameInit();
 			p2.GameInit();
 			p1.ShowMap();
 			p2.ShowMap();
 			simflag = onchange;
+			crepeat = 0; //同一个剧本模拟次数
 			break;
 		}
-		// fetch battles randomly
+					// fetch battles randomly
 		case onchange: {
-			if (neednewsquad) {
-				auto& p1comb = p1.combinator();
-				auto& p2comb = p2.combinator();
-				if (config.squadpath.compare("") != 0){
-					std::string path = config.squadpath + "/b_" + std::to_string(config.squadoffset + cround - 1) + ".txt";
-					std::tie(squad_unittypeid1, squad_quantity1, squad_unittypeid2, squad_quantity2) = Util::ReadPresetSquad(path);
-					p1comb.load_predefined_squad(squad_unittypeid1, squad_quantity1);
-					p2comb.load_predefined_squad(squad_unittypeid2, squad_quantity2);
-				}
-				else{
-					p1comb.clear_unitlist();
-					p1comb.reset();
-					p1comb.pick_and_rearrange_candidates();
-					p1comb.make_squad();
-					
-					p2comb.clear_unitlist();
-					p2comb.reset();
-					p2comb.pick_and_rearrange_candidates();
-					p2comb.make_squad();
-				}
-				recorder.record_combination(p1, p2);
-				neednewsquad = false;
-				crepeat = 0;
-			}
+			neednewsquad = true;
+			//std::cout << "On change" << std::endl;
+
+			wave = 0;
+			std::cout << std::endl << "Total wave:" << red_tactic.size() << "current wave:" << (wave + 1) << std::endl;
+			std::cout << "SquadFromJSON && Need New Squad" << std::endl;
+			auto& p1comb = p1.combinator();
+			auto& p2comb = p2.combinator();
+			//std::tie(squad_unittypeid1, squad_quantity1, squad_unit_position1, squad_unittypeid2, squad_quantity2, squad_unit_position2) = Util::ReadPresetJSONSquad(PATH_SQUAD);
+			std::tie(red_tactic, red_squad_vector, squad_unittypeid2, squad_quantity2, squad_unit_position2) = Util::ReadPresetJSONSquadWithTactic(PATH_SQUAD);
+
+			squad_unittypeid1 = red_squad_vector[wave].unit_id;
+			squad_quantity1 = red_squad_vector[wave].num;
+			squad_unit_position1 = red_squad_vector[wave].pos;
+
+			p1comb.load_predefined_squad(squad_unittypeid1, squad_quantity1); //加载定义好的
+			p2comb.load_predefined_squad(squad_unittypeid2, squad_quantity2);
+			//neednewsquad = false;
+
+			//std::cout << "p1comb.size:" << std::get<0>(p1comb.get_squad()).size()  << std::endl;
+
+
+
 
 #if !defined(__linux__)
 			cdelay = ndelay;
@@ -146,8 +160,9 @@ int Simulator::Update() {
 			simflag = indelay;
 			break;
 		}
-		 // delay for waiting dead body to disappear
+					 // delay for waiting dead body to disappear
 		case indelay: {
+			std::cout << "indelay" << std::endl;
 			if (cdelay) {
 				cdelay--;
 			}
@@ -156,31 +171,37 @@ int Simulator::Update() {
 			}
 			break;
 		}
-		// create units for battle
+					// create units for battle
 		case oncreate: {
+			std::cout << "on create" << std::endl;
 			auto& p1comb = p1.combinator();
 			auto& p2comb = p2.combinator();
 			std::tie(squad_unittypeid1, squad_quantity1) = p1comb.get_squad();
 			std::tie(squad_unittypeid2, squad_quantity2) = p2comb.get_squad();
-			p1.PlaceUnits(squad_unittypeid1, squad_quantity1);
-			p2.PlaceUnits(squad_unittypeid2, squad_quantity2);
-
+			//p1.PlaceUnits(squad_unittypeid1, squad_quantity1);
+			//p2.PlaceUnits(squad_unittypeid2, squad_quantity2);
+			std::cout << "should create here" << std::endl;
+			p1.PlaceUnitsPOS(squad_unittypeid1, squad_quantity1, squad_unit_position1);
+			p2.PlaceUnitsPOS(squad_unittypeid2, squad_quantity2, squad_unit_position2);
+			wave++;
 			simflag = increate;
 			break;
 		}
-		// wait until the units to be created,
-		// because units are not created instantly.
+					 // wait until the units to be created,
+					 // because units are not created instantly.
 		case increate: {
+			//std::cout << "in create" << std::endl;
 			size_t sim1size = p1.CountPlayerUnit();
 			size_t sim2size = p2.CountPlayerUnit();
+			//std::cout << "sim1size:" << sim1size << "	" << "sim2size:" << sim2size << std::endl;
 			if (sim1size != 0 && sim2size != 0) {
 				cframe = 0;
 				simflag = oncheck;
 #if !defined(__linux__)
 #ifdef SCREENCAPTURE
-				const std::string imgname1 = 
+				const std::string imgname1 =
 					config.outpath + "/s" + std::to_string(config.squadoffset + cround) + "_a" + std::to_string(crepeat) + ".png";
-				const std::string imgname2 = 
+				const std::string imgname2 =
 					config.outpath + "/s" + std::to_string(config.squadoffset + cround) + "_b" + std::to_string(crepeat) + ".png";
 
 				// TODO: Move Camera Properly (on CvC)
@@ -193,26 +214,102 @@ int Simulator::Update() {
 			}
 			break;
 		}
-		// check if one side is eliminated.
+					 // check if one side is eliminated.
 		case oncheck: {
+
 			size_t sim1size = p1.CountPlayerUnit();
 			size_t sim2size = p2.CountPlayerUnit();
 			// in battle
-			if (sim1size != 0 && sim2size != 0 && cframe < nframe) {
-				cframe++;
-				break;
+			cframe++;
+			if (cframe < nframe) {
+				if (sim2size == 0) {
+					std::cout << "player2 dead" << std::endl;
+					simflag = oncount;
+				}
+				else {
+					//player2 exist
+
+					if (sim1size == 0) {
+						if (wave < red_tactic.size()) {
+							//player1 策略没用完，player1当前小队全部阵亡，创建下一小队units
+							std::cout << "player2 not defeated && player1 have other tactics" << std::endl;
+							//player1被团灭，需要创建player1的新单位
+							std::cout << std::endl << "Total wave:" << red_tactic.size() << "current wave:" << (wave + 1) << std::endl;
+							auto& p1comb = p1.combinator();
+							squad_unittypeid1 = red_squad_vector[wave].unit_id;
+							squad_quantity1 = red_squad_vector[wave].num;
+							squad_unit_position1 = red_squad_vector[wave].pos;
+							wave++;
+							p1comb.load_predefined_squad(squad_unittypeid1, squad_quantity1); //加载定义好的
+
+							if (SquadFromJSON) {
+								std::tie(squad_unittypeid1, squad_quantity1) = p1comb.get_squad();
+								p1.PlaceUnitsPOS(squad_unittypeid1, squad_quantity1, squad_unit_position1);
+
+							}
+							int create_unit_num = 0;
+							for (auto& num : squad_quantity1) {
+								create_unit_num += num;
+							}
+							std::cout << "Should create " << create_unit_num << " units" << std::endl;
+							simflag = ingamecreate;//切换到ingamecreate等待创建完成
+						}
+						else {
+							std::cout << "player1 have no other tactics" << std::endl;
+							//player1没有策略了，就看是否有player团灭，团灭则准备结束
+							if (sim1size == 0 || sim2size == 0) {
+
+								simflag = oncount;
+							}
+						}
+
+
+					}
+					else
+					{
+						//player1,player2都存在
+					}
+				}
 			}
-			// battle ends
-			else {
+			else {//frame 超出设定范围，结束
 				std::cout << " elapsed frames: " << cframe << std::endl;
 				simflag = oncount;
-				break;
+				//break;
 			}
+
+			break;
+		}
+		case ingamecreate: {
+			//std::cout << "in create" << std::endl;
+			size_t sim1size = p1.CountPlayerUnit();
+			size_t sim2size = p2.CountPlayerUnit();
+			//std::cout << "sim1size:" << sim1size << "	" << "sim2size:" << sim2size << std::endl;
+			if (sim1size != 0) {
+				cframe++;
+				simflag = oncheck;
+#if !defined(__linux__)
+#ifdef SCREENCAPTURE
+				const std::string imgname1 =
+					config.outpath + "/s" + std::to_string(config.squadoffset + cround) + "_a" + std::to_string(crepeat) + ".png";
+				const std::string imgname2 =
+					config.outpath + "/s" + std::to_string(config.squadoffset + cround) + "_b" + std::to_string(crepeat) + ".png";
+
+				// TODO: Move Camera Properly (on CvC)
+				p1.MoveCamera();
+				p1.ScreenCapture(imgname1);
+				p2.MoveCamera();
+				p2.ScreenCapture(imgname2);
+#endif // SCREENCAPTURE
+#endif // !defined(__linux__)
+			}
+			cdelay = ndelay;
+
+			break;
 		}
 		case oncount: {
 			size_t sim1size = p1.CountPlayerUnit();
 			size_t sim2size = p2.CountPlayerUnit();
-
+			std::cout << "on count" << std::endl;
 			std::string result;
 			// timeout
 			if (cframe >= nframe) {
@@ -230,39 +327,53 @@ int Simulator::Update() {
 			else {
 				result = "draw";
 			}
-
-			recorder.record_result(p1, p2, result, cframe);
 			cbattle++;
 			crepeat++;
+
+			std::cout << "Result:" << result << std::endl;
+			std::cout << "crepeat:" << crepeat << ",nrepeat" << nrepeat << std::endl;
+			std::cout << "cround:" << cround << ",nround" << nround << std::endl;
+			std::cout << "cbattle:" << cbattle << ",nbattle" << nbattle << std::endl;
+			recorder.record_result(p1, p2, result, cframe);
+			/*
 			if (crepeat >= nrepeat) {
+				std::cout << "branch:crepeat >= nrepeat" << std::endl;
 				recorder.writefile(config.outpath + "/r_" + std::to_string(config.squadoffset + cround) + ".json");
 				recorder.clear();
-				neednewsquad = true;
+				//neednewsquad = true;
 				cround++; // after printing, count the rounds.
 			}
-			
-			if (cround <= nround && cbattle < nbattle) {
+			*/
+			//if (cround <= nround && cbattle < nbattle) {
+			if (crepeat < nrepeat) {
+				std::cout << "crepeat < nrepeat" << std::endl;
 				simflag = onremove;
 				break;
 			}
 			else { // finish the simulation (and restart if needed).
+				std::cout << "branch:else" << std::endl;
 				simflag = onfinish;
 				break;
 			}
 		}
 		case onremove: {
+			std::cout << "onremove" << std::endl;
 			p1.KillPlayerUnit();
 			p2.KillPlayerUnit();
 			simflag = inremove;
 			cdelay = ndelay;
+
 			break;
 		}
-		// wait until all units are cleared
+					 // wait until all units are cleared
 		case inremove: {
+			std::cout << "inremove" << std::endl;
 			size_t sim1size = p1.CountPlayerUnit();
 			size_t sim2size = p2.CountPlayerUnit();
+
 			if (sim1size == 0 && sim2size == 0) {
 				simflag = onchange;
+				std::cout << "!!!from inremove to onchange!!!" << std::endl;
 			}
 			// to prevent an infinite loop, remove units again
 			// (e.g. merging archon is not cleared)
@@ -274,19 +385,29 @@ int Simulator::Update() {
 			}
 			break;
 		}
-		// simulation end
+					 // simulation end
 		case onfinish: {
+			std::cout << "onfinish" << std::endl;
+			sc2::Agent* sim1 = p1.Bot();
+			sim1->Control()->SaveReplay(REPLAY_PATH);
+			p1.KillPlayerUnit();
+			p2.KillPlayerUnit();
 			_coordinator->LeaveGame();
-
+			std::cout << "Leave Game" << std::endl;
 			cdelay = 0;
 			simflag = infinish;
+			std::cout << simflag << std::endl;
 			break;
 		}
-		// finishing. it takes about 4 steps to finish.
+					 // finishing. it takes about 4 steps to finish.
 		case infinish: {
+			crepeat++;
+			cround++;
+			//std::cout << std::endl << "Game to finish" << std::endl;
+
 			break;
 		}
-		// error
+					 // error
 		default: {
 			std::cerr << "FATAL: simulation state error." << std::endl;
 			exit(1);
@@ -300,19 +421,18 @@ int Simulator::Update() {
 			p2.SendDebug();
 		}
 	}
-
 	std::cout << "end of a game." << std::endl;
-
 	return 0;
 }
+
 
 Simulator::~Simulator() {
 	delete _coordinator;
 }
 
-Simulator::Simulator(int argc, char* argv[], const SimulatorConfig& config) :
-	cround(1),
-	crepeat(0),
+Simulator::Simulator(int argc, char* argv[], const SimulatorConfig& config, bool FromJSON) :
+	cround(1),	// 轮次
+	crepeat(1),
 	neednewsquad(true),
 	argc(argc),
 	argv(argv),
@@ -322,18 +442,19 @@ Simulator::Simulator(int argc, char* argv[], const SimulatorConfig& config) :
 	stepsize(config.stepsize),
 	a1(nullptr),
 	a2(nullptr),
-	_coordinator(nullptr)
+	_coordinator(nullptr),
+	SquadFromJSON(FromJSON)
 {
 }
 
-void Simulator::set(){
+void Simulator::set() {
 	_coordinator = new sc2::Coordinator();
-//#ifdef SCREENCAPTURE
+	//#ifdef SCREENCAPTURE
 #if !defined(__linux__)
 	sc2::RenderSettings settings(800, 600, 300, 300);
 	_coordinator->SetRender(settings);
 #endif // !defined(__linux__)
-//#endif // SCREENCAPTURE
+	//#endif // SCREENCAPTURE
 
 	_coordinator->LoadSettings(argc, argv);
 	_coordinator->SetWindowSize(960, 720);
@@ -352,7 +473,7 @@ void Simulator::set(){
 		p2.SetBot(a1, 4);
 		_coordinator->SetParticipants({
 			CreateParticipant(config.player1.race, a1)
-		});
+			});
 	}
 	else if (config.simmode == SimulatorConfig::SimMode::PvC) {
 		a1 = new Simbot("PlayerBot");
@@ -362,7 +483,7 @@ void Simulator::set(){
 		_coordinator->SetParticipants({
 			CreateParticipant(config.player1.race, a1),
 			CreateParticipant(config.player2.race, a2),
-		});
+			});
 	}
 	else {  // config.simmode == SimulatorConfig::SimMode::PvP
 		a1 = new Simbot("Player1Bot");
@@ -372,9 +493,9 @@ void Simulator::set(){
 		_coordinator->SetParticipants({
 			CreateParticipant(config.player1.race, a1),
 			CreateParticipant(config.player2.race, a2),
-		});
+			});
 	}
-	
+
 	_coordinator->SetPortStart(config.port);
 
 #ifdef SCREENCAPTURE

@@ -21,7 +21,7 @@ private:
 public:
 
 	// This agent must see all of #playerid's units
-	void SetBot(sc2::Agent* agent, playerid_t playerID=-1);
+	void SetBot(sc2::Agent* agent, playerid_t playerID = -1);
 
 	void SetConfig(const PlayerConfig& config);
 
@@ -34,12 +34,12 @@ public:
 	void GameInit();
 
 	// Count number of units with 
-	size_t CountPlayerUnit(sc2::UnitTypeID unit_type, playerid_t playerID=-1) const;
+	size_t CountPlayerUnit(sc2::UnitTypeID unit_type, playerid_t playerID = -1) const;
 
-	size_t CountPlayerUnit(playerid_t playerID=-1) const;
+	size_t CountPlayerUnit(playerid_t playerID = -1) const;
 
 	// Get list of units (seen) owned by player
-	std::tuple< std::vector<sc2::UnitTypeID>, std::vector<int> > GetSurvivedUnits(playerid_t playerID=-1) const;
+	std::tuple< std::vector<sc2::UnitTypeID>, std::vector<int> > GetSurvivedUnits(playerid_t playerID = -1) const;
 
 	// Put unit owned by player (need to send debug)
 	void PlaceUnit(sc2::UnitTypeID unit, uint32_t numbers, sc2::Vector2D pos, playerid_t playerID);
@@ -47,20 +47,33 @@ public:
 	// Put list of units owned by player (need to send debug)
 	std::vector<int> PlaceUnits(
 		const std::vector<sc2::UnitTypeID>& squad_unittypeid,
-		const std::vector<int>& squad_quantity, 
+		const std::vector<int>& squad_quantity,
 		sc2::Vector2D pos,
 		playerid_t playerID,
-		bool shuffle=true
+		bool shuffle = true
 	);
+
 
 	// Put list of units as predefined way.
 	std::vector<int> PlaceUnits(
 		const std::vector<sc2::UnitTypeID>& squad_unittypeid,
-		const std::vector<int>& squad_quantity, 
-		bool shuffle=true);
+		const std::vector<int>& squad_quantity,
+		bool shuffle = true);
+	std::vector<int> Player::PlaceUnitsPOS(
+		const std::vector<sc2::UnitTypeID>& squad_unittypeid,
+		const std::vector<int>& squad_quantity,
+		std::vector<sc2::Vector2D> pos_vec,
+		playerid_t playerID,
+		bool shuffle
+	);
+	std::vector<int> PlaceUnitsPOS(
+		const std::vector<sc2::UnitTypeID>& squad_unittypeid,
+		const std::vector<int>& squad_quantity,
+		std::vector<std::string>& pos_id,
+		bool shuffle = true);
 
 	// Kill all (seen) units owned by player (need to send debug)
-	void KillPlayerUnit(playerid_t playerID=-1);
+	void KillPlayerUnit(playerid_t playerID = -1);
 
 	// Kill all (seen) units captured by filter (need to send debug)
 	void KillUnit(sc2::Filter f);
@@ -73,7 +86,7 @@ public:
 
 	// End game
 	void LeaveGame();
-	
+
 	// Move Camera to Center of units
 	void MoveCamera();
 

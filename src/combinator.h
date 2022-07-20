@@ -22,36 +22,36 @@ public:
 
 	// step 1b (additional) - set resources
 	void clear_resources();
-	void set_resources(int mineral, int gas, float food);
-	void add_resources(int mineral, int gas, float food);
+	void set_resources(int mineral, int gas, float food);//设置mineral,gas,food三个资源
+	void add_resources(int mineral, int gas, float food);//添加mineral,gas,food三个资源
 
 	// step 1b (additional) - set unitlists
-	void clear_unitlist();
-	void add_unitlist(int index); // predefined index
-	void add_unitlist(const std::string& unitname); // name
-	void add_unitlist(const std::vector<sc2::UnitTypeID>& candidates); // unittypeids
+	void clear_unitlist();	// 清除
+	void add_unitlist(int index); // predefined index 将定义好的predefined_cand中的index对应的单位的id添加到this->candidates中
+	void add_unitlist(const std::string& unitname); // name 将单位name对应的id添加到this->candidates中
+	void add_unitlist(const std::vector<sc2::UnitTypeID>& candidates); // unittypeids 将这个candidates append到this->candidates
 
 	// step 2 - priorities are mixed
-	bool pick_and_rearrange_candidates(float probability = 1.0f);
-	
+	bool pick_and_rearrange_candidates(float probability = 1.0f);//从this->candidates中随机选择unit并打乱
+
 	// step 3 - make squad
-	bool make_squad();
-	bool make_squad_simultaneous();
+	bool make_squad();		//从candidates中的unittypeid随机设置数量，根据mineral,gas,food的余量生成到squad_unittypeid,squad_quantity
+	bool make_squad_simultaneous();//这个是把初始资源作为get_unit_affordable的参数求num_affordable，感觉不太对
 
 	// step 4 - get all infos
-	std::tuple<int, int, float> get_resources() const;
-	std::vector<sc2::UnitTypeID> get_unitlist() const;
-	std::tuple< std::vector<sc2::UnitTypeID>, std::vector<int> > get_squad() const;
+	std::tuple<int, int, float> get_resources() const;//返回mineral, gas, food的tuple
+	std::vector<sc2::UnitTypeID> get_unitlist() const;//返回candidates
+	std::tuple< std::vector<sc2::UnitTypeID>, std::vector<int> > get_squad() const;//返回squad_unittypeid, squad_quantity的tuple
 
 	// load/dump
 	void load_predefined_squad(
-		const std::vector<sc2::UnitTypeID>& squad_unittypeid, 
+		const std::vector<sc2::UnitTypeID>& squad_unittypeid,
 		const std::vector<int>& squad_quantity
 	);
 
 private:
 	RandomSample random;
-    bool use_config = false;
+	bool use_config = false;
 	CombinatorConfig config;
 	sc2::UnitTypes unitdata;
 	int32_t mineral;
@@ -73,6 +73,6 @@ private:
 	void subtract_unit_resource(sc2::UnitTypeID unittypeid, int32_t num_units);
 
 	// Convert namestring to unittypeid.
-    // Warning: Input name must not include race : ex) zergling
+	// Warning: Input name must not include race : ex) zergling
 	sc2::UnitTypeID NameToUnitTypeID(const std::string& name) const;
 };

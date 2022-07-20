@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
 		      << SC2CombatSim_VERSION_MINOR 
 		      << std::endl;
 	SimulatorConfig config(PATH_CONFIG);
-	Simulator simulator(argc, argv, config);
+	Simulator simulator(argc, argv, config,false);
 
 	simulator.squadgen();
 

@@ -5,13 +5,14 @@
 #include <iostream>
 
 int main(int argc, char* argv[]) {
-	std::cout << "SC2Sim version " 
-		      << SC2CombatSim_VERSION_MAJOR 
-		      << "."
-		      << SC2CombatSim_VERSION_MINOR 
-		      << std::endl;
+
+	std::cout << "SC2Sim version "
+		<< SC2CombatSim_VERSION_MAJOR
+		<< "."
+		<< SC2CombatSim_VERSION_MINOR
+		<< std::endl;
 	SimulatorConfig config(PATH_CONFIG);
-	Simulator simulator(argc, argv, config);
+	Simulator simulator(argc, argv, config, true);
 
 	simulator.Begin();
 

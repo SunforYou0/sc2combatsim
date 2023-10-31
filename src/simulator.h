@@ -24,14 +24,14 @@ private:
 	const int32_t nrepeat; // number of repetition of same simulation
 	int32_t cround;
 	int32_t crepeat = 0;
-
+	std::string squad_path;
 	const int32_t stepsize;
 
 	sc2::Coordinator* _coordinator;
 
 public:
 	~Simulator();
-	Simulator(int argc, char* argv[], const SimulatorConfig& config, bool SquadFromJSON);
+	Simulator(int argc, char* argv[], const SimulatorConfig& config, std::string path);
 	sc2::Coordinator* Coordinator();
 	void set();
 	void reset();

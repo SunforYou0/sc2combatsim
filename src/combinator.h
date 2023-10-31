@@ -42,6 +42,7 @@ public:
 	std::tuple<int, int, float> get_resources() const;//返回mineral, gas, food的tuple
 	std::vector<sc2::UnitTypeID> get_unitlist() const;//返回candidates
 	std::tuple< std::vector<sc2::UnitTypeID>, std::vector<int> > get_squad() const;//返回squad_unittypeid, squad_quantity的tuple
+	float GetUnitsAffordable(float mineral, float gas, float food, std::unordered_map<std::string, int> SomeKindArmor);
 
 	// load/dump
 	void load_predefined_squad(
@@ -68,7 +69,6 @@ private:
 	// Get max number of the given unit that we can buy with the given resource.
 	float get_unit_affordable(sc2::UnitTypeID unittypeid);
 	float get_unit_affordable(sc2::UnitTypeID unittypeid, int32_t mineral, int32_t gas, float food);
-
 	// Subtract resource with the amount of the cost of the unit.
 	void subtract_unit_resource(sc2::UnitTypeID unittypeid, int32_t num_units);
 

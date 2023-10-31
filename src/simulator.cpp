@@ -1,4 +1,4 @@
-#include "simulator.h"
+	#include "simulator.h"
 
 #include "bots.h"
 #include "util.h"
@@ -8,18 +8,22 @@
 #include <thread>
 #include <chrono>
 #include <iostream>
-
+#include "util.h"
 //#define SCREENCAPTURE
-#define PATH_SQUAD "D:/scII/sc2combatsim/config//squad.json"
-#define WORK_PATH	"D:/scII/sc2combatsim/config"
-#define REPLAY_PATH "D:/scII/sc2combatsim/config//1.SC2Replay"
+//#define PATH_SQUAD "D:/scII/sc2combatsim/config//squad.json"
+//#define WORK_PATH	"D:/scII/sc2combatsim/config"
+//#define REPLAY_PATH "D:/scII/sc2combatsim/config//1.SC2Replay"
+
+
 int Simulator::Begin() {
 
 	set();
 	bool CREATE_FLAG = false;
 	// nround 不同剧本的数量
-	while (nround >= cround) { // While simulation is not finished. cround |-> Z_[1, nround] 
-		std::cout << std::endl << "begin::croung/nround:" << cround << "/" << nround << std::endl;
+	
+
+	//for (std::filesystem::path file :files) { // While simulation is not finished. cround |-> Z_[1, nround] 
+		//std::cout << std::endl << "begin::croung/nround:" << cround << "/" << nround << std::endl;
 		std::cout << "launch!" << std::endl;
 		_coordinator->LaunchStarcraft();
 
@@ -70,7 +74,7 @@ int Simulator::Begin() {
 
 		cround++;
 		std::cout << std::endl << "croung/nround" << cround << std::endl;
-	}
+	//}
 	return 0;
 }
 
@@ -100,10 +104,10 @@ int Simulator::Update() {
 	int32_t cframe = 0;
 	int32_t cbattle = 0;
 	int32_t cdelay = 0;
-
+	int player2_total_num = 0;
 	std::vector<std::string> red_tactic;
 	std::vector<Util::POS_SQUAD> red_squad_vector;
-
+	int wave_num = 3;
 	int wave = 0;	// attack wave
 	std::vector<sc2::UnitTypeID> squad_unittypeid1, squad_unittypeid2;	// 类型id，要先找到这个sc2::UnitTypeID
 	std::vector<int> squad_quantity1, squad_quantity2;	// 数量
@@ -131,16 +135,18 @@ int Simulator::Update() {
 					// fetch battles randomly
 		case onchange: {
 			neednewsquad = true;
-			//std::cout << "On change" << std::endl;
+			std::cout << "On change" << std::endl;
 
 			wave = 0;
-			std::cout << std::endl << "Total wave:" << red_tactic.size() << "current wave:" << (wave + 1) << std::endl;
+			
 			std::cout << "SquadFromJSON && Need New Squad" << std::endl;
 			auto& p1comb = p1.combinator();
 			auto& p2comb = p2.combinator();
 			//std::tie(squad_unittypeid1, squad_quantity1, squad_unit_position1, squad_unittypeid2, squad_quantity2, squad_unit_position2) = Util::ReadPresetJSONSquad(PATH_SQUAD);
-			std::tie(red_tactic, red_squad_vector, squad_unittypeid2, squad_quantity2, squad_unit_position2) = Util::ReadPresetJSONSquadWithTactic(PATH_SQUAD);
-
+			std::tie( red_squad_vector, squad_unittypeid2, squad_quantity2, squad_unit_position2) = Util::ReadPresetJSONSquadWithTactic(squad_path);
+			for (int player2_num : squad_quantity2) {
+				player2_total_num += player2_num;
+			}
 			squad_unittypeid1 = red_squad_vector[wave].unit_id;
 			squad_quantity1 = red_squad_vector[wave].num;
 			squad_unit_position1 = red_squad_vector[wave].pos;
@@ -148,11 +154,7 @@ int Simulator::Update() {
 			p1comb.load_predefined_squad(squad_unittypeid1, squad_quantity1); //加载定义好的
 			p2comb.load_predefined_squad(squad_unittypeid2, squad_quantity2);
 			//neednewsquad = false;
-
 			//std::cout << "p1comb.size:" << std::get<0>(p1comb.get_squad()).size()  << std::endl;
-
-
-
 
 #if !defined(__linux__)
 			cdelay = ndelay;
@@ -195,6 +197,7 @@ int Simulator::Update() {
 			size_t sim2size = p2.CountPlayerUnit();
 			//std::cout << "sim1size:" << sim1size << "	" << "sim2size:" << sim2size << std::endl;
 			if (sim1size != 0 && sim2size != 0) {
+				
 				cframe = 0;
 				simflag = oncheck;
 #if !defined(__linux__)
@@ -222,19 +225,21 @@ int Simulator::Update() {
 			// in battle
 			cframe++;
 			if (cframe < nframe) {
-				if (sim2size == 0) {
-					std::cout << "player2 dead" << std::endl;
+				if (sim2size < 0.2 * player2_total_num) {
+					//原判定条件sim2size == 0
+					std::cout << "player2 lose" << std::endl;
 					simflag = oncount;
 				}
 				else {
 					//player2 exist
 
 					if (sim1size == 0) {
-						if (wave < red_tactic.size()) {
+						std::cout << "player1 dead" << std::endl;
+						if (wave < wave_num) {
 							//player1 策略没用完，player1当前小队全部阵亡，创建下一小队units
 							std::cout << "player2 not defeated && player1 have other tactics" << std::endl;
 							//player1被团灭，需要创建player1的新单位
-							std::cout << std::endl << "Total wave:" << red_tactic.size() << "current wave:" << (wave + 1) << std::endl;
+							std::cout << std::endl << "Total wave:" << wave_num << "current wave:" << (wave + 1) << std::endl;
 							auto& p1comb = p1.combinator();
 							squad_unittypeid1 = red_squad_vector[wave].unit_id;
 							squad_quantity1 = red_squad_vector[wave].num;
@@ -257,7 +262,7 @@ int Simulator::Update() {
 						else {
 							std::cout << "player1 have no other tactics" << std::endl;
 							//player1没有策略了，就看是否有player团灭，团灭则准备结束
-							if (sim1size == 0 || sim2size == 0) {
+							if (sim1size == 0 || sim2size <0.2*player2_total_num) {
 
 								simflag = oncount;
 							}
@@ -389,7 +394,7 @@ int Simulator::Update() {
 		case onfinish: {
 			std::cout << "onfinish" << std::endl;
 			sc2::Agent* sim1 = p1.Bot();
-			sim1->Control()->SaveReplay(REPLAY_PATH);
+			//sim1->Control()->SaveReplay(REPLAY_PATH);
 			p1.KillPlayerUnit();
 			p2.KillPlayerUnit();
 			_coordinator->LeaveGame();
@@ -430,7 +435,7 @@ Simulator::~Simulator() {
 	delete _coordinator;
 }
 
-Simulator::Simulator(int argc, char* argv[], const SimulatorConfig& config, bool FromJSON) :
+Simulator::Simulator(int argc, char* argv[], const SimulatorConfig& config, std::string path) :
 	cround(1),	// 轮次
 	crepeat(1),
 	neednewsquad(true),
@@ -443,8 +448,9 @@ Simulator::Simulator(int argc, char* argv[], const SimulatorConfig& config, bool
 	a1(nullptr),
 	a2(nullptr),
 	_coordinator(nullptr),
-	SquadFromJSON(FromJSON)
+	squad_path(path)
 {
+	
 }
 
 void Simulator::set() {

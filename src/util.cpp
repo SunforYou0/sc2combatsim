@@ -1,13 +1,14 @@
 #include "util.h"
 
 #include "lodepng.h"
+#include "combinator.h"
 
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <iomanip>
-
+#include<algorithm>
 #include "json/json.h"
 //#define TEST
 
@@ -494,13 +495,9 @@ namespace Util {
 
 	}
 
-	std::tuple<std::vector<std::string>, std::vector<POS_SQUAD>, std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<std::string>>
+	std::tuple< std::vector<POS_SQUAD>, std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<std::string>>
 		ReadPresetJSONSquadWithTactic(const std::string& path) {
-		//std::ifstream fin;
-
-		//std::vector<sc2::UnitTypeID> squad_unittypeid1;
-		//std::vector<int> squad_quantity1;
-		//std::vector<std::string> squad_unit_position1;
+		
 		std::vector<sc2::UnitTypeID> squad_unittypeid2;
 		std::vector<int> squad_quantity2;
 		std::vector<std::string> squad_unit_position2;
@@ -509,7 +506,7 @@ namespace Util {
 		std::string buffer;
 
 		std::vector<POS_SQUAD> red_squad_vector;
-		std::vector<std::string> red_tactic; //红方策略
+		//std::vector<std::string> red_tactic; //红方策略
 		std::cout << "\nReading sqauds from : " << path << std::endl;
 		Json::Value root;
 
@@ -541,15 +538,15 @@ namespace Util {
 			exit(1);
 		}
 		Json::Value redTeam = root["red"];
-		Json::Value tactic = redTeam["tactic"];
+		//Json::Value tactic = redTeam["tactic"];
+		/*
 		for (const Json::Value& WaveTactic : tactic) {
 			red_tactic.push_back(WaveTactic.asString());
 		}
-		Json::Value red_squad = redTeam["squad"];
+		*/
+		// Json::Value red_squad = redTeam["squad"];
 
-
-
-		std::vector<Json::Value> RedSquadVector = { red_squad["E"],red_squad["S"],red_squad["W"],red_squad["N"] };
+		std::vector<Json::Value> RedSquadVector = { redTeam["wave1"], redTeam["wave2"], redTeam["wave3"]};
 		int i = 0;
 		for (const Json::Value& pos_squad : RedSquadVector) {
 			POS_SQUAD pos_squad_struct;
@@ -597,7 +594,205 @@ namespace Util {
 		}
 #endif // TEST
 
-		return std::make_tuple(red_tactic, red_squad_vector, squad_unittypeid2, squad_quantity2, squad_unit_position2);
+		return std::make_tuple(red_squad_vector, squad_unittypeid2, squad_quantity2, squad_unit_position2);
+	}
+	inline std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, int>>> InitUnitForMassGeneration() {
+		std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, int>>>  units_id;
+		
+		std::unordered_map<std::string, std::unordered_map<std::string, int>> Protoss;
+		std::unordered_map<std::string, std::unordered_map<std::string, int>> Terran;
+		std::unordered_map<std::string, std::unordered_map<std::string, int>> Zerg;
+
+		std::unordered_map<std::string, int> Protoss_NoArmor;
+		std::unordered_map<std::string, int> Protoss_LightArmor;
+		std::unordered_map<std::string, int> Protoss_HeavyArmor;
+		std::unordered_map<std::string, int> Terran_NoArmor;
+		std::unordered_map<std::string, int> Terran_LightArmor;
+		std::unordered_map<std::string, int> Terran_HeavyArmor;
+		std::unordered_map<std::string, int> Zerg_NoArmor;
+		std::unordered_map<std::string, int> Zerg_LightArmor;
+		std::unordered_map<std::string, int> Zerg_HeavyArmor;
+		
+		Protoss_LightArmor["Adept"] = 311;// 圣徒
+		Protoss_NoArmor["Archon"] = 141;//执政官	-
+		Protoss_HeavyArmor["Colossus"] = 4;//巨像	+
+		Protoss_LightArmor["HighTemplar"] = 75;//高阶圣堂武士
+		Protoss_HeavyArmor["Immortal"] = 83;//不朽者	+
+		Protoss_LightArmor["Sentry"] = 77;//机械哨兵
+		Protoss_HeavyArmor["Stalker"] = 74;//追猎者	+
+		Protoss_LightArmor["Zealot"] = 73;//狂热者
+		Protoss["NoArmor"] = Protoss_NoArmor;
+		Protoss["LightArmor"] = Protoss_LightArmor;
+		Protoss["HeavyArmor"] = Protoss_HeavyArmor;
+
+		Terran_HeavyArmor["Cyclone"] = 692;//飓风		+
+		Terran_NoArmor["Ghost"] = 50;//幽灵	-
+		Terran_LightArmor["Hellion"] = 53;//恶火
+		Terran_LightArmor["Hellbat"] = 484;//恶蝠
+		Terran_HeavyArmor["Marauder"] = 51;//劫掠者		+
+		Terran_LightArmor["Marine"] = 48;//陆战队员
+		Terran_LightArmor["Reaper"] = 49;//收割者
+		Terran_HeavyArmor["SiegeTank"] = 33;//攻城坦克	+
+		Terran_HeavyArmor["Thor"] = 52;//雷神		+
+		Terran["NoArmor"] = Terran_NoArmor;
+		Terran["LightArmor"] = Terran_LightArmor;
+		Terran["HeavyArmor"] = Terran_HeavyArmor;
+
+
+		Zerg_NoArmor["Baneling"] = 9;//爆虫	-
+		Zerg_LightArmor["Hydralisk"] = 107;//刺蛇
+		Zerg_HeavyArmor["Lurker"] = 502;//潜伏者	+
+		Zerg_NoArmor["Queen"] = 126;//虫后	-
+		Zerg_NoArmor["Ravager"] = 688;//破坏者	-
+		Zerg_HeavyArmor["Roach"] = 110;//蟑螂	+
+		Zerg_LightArmor["Ultralisk"] = 109;//跳虫
+		Zerg_HeavyArmor["Zergling"] = 105;//雷兽	+
+		Zerg["NoArmor"] = Zerg_NoArmor;
+		Zerg["LightArmor"] = Zerg_LightArmor;
+		Zerg["HeavyArmor"] = Zerg_HeavyArmor;
+						
+		units_id["Protoss"] = Protoss;
+		units_id["Terran"] = Terran;
+		units_id["Zerg"] = Zerg;
+
+#ifdef UnitTEST
+		std::cout << "Unit ids of Protoss,Terran and Zerg:" << std::endl;
+		PrintUnorderedMap(units_id["Protoss"]);
+		PrintUnorderedMap(units_id["Terran"]);
+		PrintUnorderedMap(units_id["Zerg"]);
+		std::cout << "Protoss.Stalker:" << units_id["Protoss"]["Stalker"] << std::endl;
+#endif // UnitTEST
+		return units_id;
+	}
+
+	int GenerateMassSquad(const std::string& path,Combinator &combinator){
+		float red_total_mineral = 20000;
+		float red_total_gas = 20000;
+		float red_total_food = 200;
+
+		float blue_total_mineral = 15000;
+		float blue_total_gas = 15000;
+		float blue_total_food = 150;
+		
+		float ResourceRatio[6][3] = { {0.2,0.3,0.5},{0.2,0.5,0.3},{0.3,0.2,0.5},{0.3,0.5,0.2},{0.5,0.2,0.3},{0.5,0.3,0.2} };// 无甲，轻甲，重甲
+		std::string	 Race[3] = {"Protoss","Terran","Zerg"};
+		
+		std::string locations[4][3] = { {"E","S","W"},{"S","W","N"},{"W","N","E"},{"N","E","S"}};//方向轮换
+		
+		int count = 0;
+		
+		std::unordered_map<std::string, std::unordered_map<std::string, std::unordered_map<std::string, int>>> units_map=InitUnitForMassGeneration();
+		std::unordered_map<std::string, int> blue_armor_num;
+
+		std::cout << "!!!There1111!!!" << std::endl;
+		blue_armor_num["NoArmor"] = std::floor(combinator.GetUnitsAffordable(blue_total_mineral * 0.3, blue_total_gas * 0.3, blue_total_food * 0.3, units_map["Zerg"]["NoArmor"]));
+		std::cout << "!!!There2222!!!" << std::endl;
+		blue_armor_num["LightArmor"] = std::floor(combinator.GetUnitsAffordable(blue_total_mineral * 0.3, blue_total_gas * 0.3, blue_total_food * 0.3, units_map["Zerg"]["LightArmor"]));
+		std::cout << "!!!There3333!!!" << std::endl;
+		blue_armor_num["HeavyArmor"] = std::floor(combinator.GetUnitsAffordable(blue_total_mineral * 0.4, blue_total_gas * 0.4, blue_total_food * 0.4, units_map["Zerg"]["HeavyArmor"]));
+
+		Json::Value blue;
+		std::cout << "!!!There!!!" << std::endl;
+		for (const std::string armor_str : { "NoArmor", "LightArmor", "HeavyArmor" })
+		{	//blue-player
+			std::cout << "!!!There!!!" << std::endl;
+			for (const auto& unit : units_map["Zerg"][armor_str]) {
+				Json::Value unit_in_wave;
+				unit_in_wave["race"] = "Zerg";
+				unit_in_wave["unit"] = unit.first;
+				unit_in_wave["num"] = static_cast<int>(std::floor(blue_armor_num[armor_str] ));
+				unit_in_wave["pos"] = "M";
+				blue.append(unit_in_wave);
+			}
+		}
+		
+		for (std::string race:Race) {
+			//	种族轮换
+			std::unordered_map<std::string, std::unordered_map<std::string, int>> RaceUnits = units_map[race];
+			for (const auto ratio:ResourceRatio) {
+				//	resource ratio 轮换
+				// 生成player1的阵容
+				// int get_unit_affordable();
+				// 护甲类型相同的单位，数量也相同
+				
+				std::unordered_map<std::string, int> ArmorNums;
+				ArmorNums["NoArmor"] = std::floor(combinator.GetUnitsAffordable(red_total_mineral * ratio[0], red_total_gas * ratio[0], red_total_food * ratio[0], RaceUnits["NoArmor"]));
+				ArmorNums["LightArmor"] = std::floor(combinator.GetUnitsAffordable(red_total_mineral * ratio[1], red_total_gas * ratio[1], red_total_food * ratio[1], RaceUnits["LightArmor"]));
+				ArmorNums["HeavyArmor"] = std::floor(combinator.GetUnitsAffordable(red_total_mineral * ratio[2], red_total_gas * ratio[2], red_total_food * ratio[2], RaceUnits["HeavyArmor"]));
+
+				for (const auto loc:locations) {
+					// 波次的位置轮换
+					for(const auto num:ResourceRatio){
+						//每个波次的数量比例轮换
+						
+						Json::Value root;
+						Json::Value red;
+						//Json::Value tactic;
+						Json::Value wave1;
+						Json::Value wave2;
+						Json::Value wave3;
+						
+						for (const auto armor_str : { "NoArmor", "LightArmor", "HeavyArmor" }) 
+						{
+							// red-player
+							
+							for(const auto & unit : RaceUnits[armor_str]) {
+								std::cout << " unit name" << unit.first << std::endl;
+							Json::Value unit_in_wave_1;
+							unit_in_wave_1["race"] = race;
+							unit_in_wave_1["unit"] = unit.first;
+							unit_in_wave_1["num"] = static_cast<int>(std::floor(ArmorNums[armor_str] * num[0]));
+							unit_in_wave_1["pos"] = loc[0];
+							wave1.append(unit_in_wave_1);
+
+							Json::Value unit_in_wave_2;
+							unit_in_wave_2["race"] = race;
+							unit_in_wave_2["unit"] = unit.first;
+							unit_in_wave_2["num"] = static_cast<int>(std::floor(ArmorNums[armor_str] * num[1]));
+							unit_in_wave_2["pos"] = loc[1];
+							wave2.append(unit_in_wave_2);
+
+							Json::Value unit_in_wave_3;
+							unit_in_wave_3["race"] = race;
+							unit_in_wave_3["unit"] = unit.first;
+							unit_in_wave_3["num"] = static_cast<int>(ArmorNums[armor_str] - std::floor(ArmorNums[armor_str] * num[0]) - std::floor(ArmorNums[armor_str] * num[1]));
+							unit_in_wave_3["pos"] = loc[2];
+							wave3.append(unit_in_wave_3);
+						}
+						}
+						
+						red["wave1"] = wave1;
+						red["wave2"] = wave2;
+						red["wave3"] = wave3;
+						root["red"] = red;
+						root["blue"] = blue;
+						//生成json，写入配置
+						std::stringstream ss;
+						ss << std::setw(4) << std::setfill('0') << count;
+						
+						std::ofstream outputFile(path+"\\" + ss.str() + ".json");//count作为编号
+						Json::StreamWriterBuilder writer;
+						std::string jsonStr = Json::writeString(writer, root);
+						outputFile << jsonStr;
+						outputFile.close();
+						count++;
+					}
+				}
+			}
+		}
+		return 0;
+	}
+
+	std::vector<std::filesystem::path> get_all_files_with_extension(const std::filesystem::path& root, const std::string& ext) {
+		std::vector<std::filesystem::path> paths;
+		if (std::filesystem::exists(root) && std::filesystem::is_directory(root)) {
+			for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+				if (entry.is_regular_file() && entry.path().extension() == ext) {
+					paths.push_back(entry.path());
+				}
+			}
+		}
+		return paths;
 	}
 
 }

@@ -1,8 +1,11 @@
 #pragma once
 
 #include <sc2api/sc2_api.h>
-
+#include "combinator.h"
 #include <string>
+#include <iostream>
+#include <vector>
+#include <filesystem>
 
 namespace Util {
 	struct POS_SQUAD {
@@ -20,8 +23,9 @@ namespace Util {
 	std::tuple<std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<sc2::UnitTypeID>, std::vector<int> > ReadPresetSquad(const std::string& path);
 	std::tuple<std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<std::string>, std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<std::string>>
 		ReadPresetJSONSquad(const std::string& path);
-	std::tuple<std::vector<std::string>, std::vector<POS_SQUAD>, std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<std::string>>
+	std::tuple< std::vector<POS_SQUAD>, std::vector<sc2::UnitTypeID>, std::vector<int>, std::vector<std::string>>
 		ReadPresetJSONSquadWithTactic(const std::string& path);
+	int GenerateMassSquad(const std::string& path,Combinator &combinator);
 	// Code from SC2CLIENT-API
 	//! Determines if the unit matches the unit type.
 	struct IsUnit {
@@ -43,4 +47,5 @@ namespace Util {
 			return included;
 		};
 	};
+	std::vector<std::filesystem::path> get_all_files_with_extension(const std::filesystem::path& root, const std::string& ext);
 }

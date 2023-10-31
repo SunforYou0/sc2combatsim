@@ -415,3 +415,37 @@ void Combinator::load_predefined_squad(
 	this->squad_unittypeid = squad_unittypeid;
 	this->squad_quantity = squad_quantity;
 }
+
+void PrintUnit(sc2::UnitTypes unit_datas) {
+	std::cout << "unit_datas.size" << unit_datas.size() << std::endl;
+	for (sc2::UnitTypeData data : unit_datas) {
+		std::cout << "ID:"<<data.unit_type_id<<",Name:"<<data.name << std::endl;
+	}
+
+}
+float Combinator::GetUnitsAffordable(float mineral, float gas, float food, std::unordered_map<std::string, int> SomeKindArmor) {
+	float c_m = 0.0;
+	float c_g = 0.0;
+	float c_f = 0.0;
+	//PrintUnit(unitdata);
+	for(const auto& unit:SomeKindArmor)
+	{ 
+		sc2::UnitTypeID unittypeid = static_cast<sc2::UnitTypeID>(unit.second);
+		std::cout << unittypeid << std::endl;
+
+		const sc2::UnitTypeData unittypedata = unitdata[unittypeid];
+		std::cout << "!!!There-----!!!" << std::endl;
+
+		c_m += static_cast<float>(unittypedata.mineral_cost);
+		c_g += static_cast<float>(unittypedata.vespene_cost);
+		c_f += static_cast<float>(unittypedata.food_required);
+	}
+
+	// max number: use floor function.
+	float n_m = c_m ? static_cast<float>(mineral / c_m) : std::numeric_limits<float>::max();
+	float n_g = c_g ? static_cast<float>(gas / c_g) : std::numeric_limits<float>::max();
+	float n_f = c_f ? static_cast<float>(food / c_f) : std::numeric_limits<float>::max();
+	float n_min = std::min(std::min(n_m, n_g), n_f);
+
+	return std::max(n_min, 0.0f);
+}
